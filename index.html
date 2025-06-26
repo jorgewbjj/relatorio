@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte Técnico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --main-bg: #f7f7fa;
+      --card-bg: #fff;
+      --border: #e1e1e9;
+      --primary: #333;
+      --secondary: #666;
+      --accent: #2266ee;
+      --radius: 18px;
+      --shadow: 0 4px 16px rgba(30,34,90,0.06);
+      --input-bg: #f3f4f8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--main-bg);
+      font-family: 'Inter', Arial, sans-serif;
+      color: var(--primary);
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 680px;
+      margin: 32px auto;
+      background: var(--card-bg);
+      padding: 32px 24px 24px 24px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    h2 {
+      margin: 0 0 18px 0;
+      font-weight: 700;
+      font-size: 1.7rem;
+      color: var(--accent);
+    }
+    .row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .row > .field {
+      flex: 1;
+      min-width: 160px;
+    }
+    label {
+      display: block;
+      font-size: 0.97rem;
+      margin-bottom: 4px;
+      color: var(--secondary);
+      font-weight: 500;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      color: var(--primary);
+      outline: none;
+      transition: border .2s;
+      resize: none;
+    }
+    input[type="file"] {
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+    textarea {
+      min-height: 50px;
+      resize: vertical;
+    }
+    .problema-card {
+      background: #f9faff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      padding: 16px 14px;
+      box-shadow: 0 2px 8px rgba(34,68,238,0.04);
+      position: relative;
+    }
+    .remove-btn {
+      position: absolute;
+      top: 10px; right: 10px;
+      border: none;
+      background: none;
+      font-size: 1.2rem;
+      color: #d33;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 50%;
+      transition: background .16s;
+    }
+    .remove-btn:hover {
+      background: #fdeaea;
+    }
+    .add-btn, .submit-btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 11px 26px;
+      font-size: 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 10px;
+      box-shadow: 0 1px 4px rgba(34,68,238,0.07);
+      transition: background .15s;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+    .add-btn:hover, .submit-btn:hover {
+      background: #1143bb;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 18px 5vw; }
+      .row { flex-direction: column; gap: 7px; }
+      h2 { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Reporte Técnico</h2>
+    <form id="reporteForm" autocomplete="off">
+      <div class="row">
+        <div class="field">
+          <label for="data">Data</label>
+          <input type="date" id="data" name="data" required>
+        </div>
+        <div class="field">
+          <label for="tecnico">Técnico</label>
+          <input type="text" id="tecnico" name="tecnico" placeholder="Nome do técnico" required>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:2">
+          <label for="cliente">Cliente</label>
+          <input type="text" id="cliente" name="cliente" placeholder="Nome do cliente" required>
+        </div>
+      </div>
+
+      <div id="problemasContainer">
+        <!-- Problemas vão aparecer aqui -->
+      </div>
+      <button type="button" class="add-btn" onclick="adicionarProblema()">+ Adicionar Problema</button>
+      <button type="submit" class="submit-btn">Enviar Reporte</button>
+    </form>
+  </div>
+  
+  <template id="problemaTemplate">
+    <div class="problema-card">
+      <button type="button" class="remove-btn" title="Remover problema" onclick="removerProblema(this)">×</button>
+      <div class="row">
+        <div class="field">
+          <label>Problema / Situação / Teste</label>
+          <input type="text" name="problema[]" placeholder="Descreva o problema ou teste" required>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Observações</label>
+          <textarea name="observacoes[]" placeholder="Adicione observações, se necessário"></textarea>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Foto (opcional)</label>
+          <input type="file" name="foto[]" accept="image/*">
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // Função para adicionar novo problema
+    function adicionarProblema() {
+      const template = document.getElementById('problemaTemplate');
+      const clone = template.content.cloneNode(true);
+      document.getElementById('problemasContainer').appendChild(clone);
+    }
+
+    // Remover problema
+    function removerProblema(btn) {
+      btn.closest('.problema-card').remove();
+    }
+
+    // Adiciona pelo menos um problema ao abrir a página
+    window.onload = function() {
+      adicionarProblema();
+    }
+
+    // Simula envio
+    document.getElementById('reporteForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      alert('Reporte enviado com sucesso! (Funcionalidade de envio pode ser implementada conforme necessário)');
+      // Aqui você pode capturar os dados do formulário para enviar via backend, Firebase, etc.
+      this.reset();
+      document.getElementById('problemasContainer').innerHTML = '';
+      adicionarProblema();
+    });
+  </script>
+</body>
+</html>
