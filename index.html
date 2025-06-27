@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+
+
+   <!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -7,12 +9,13 @@
   <!-- Firebase CDN -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
   <!-- jsPDF e html2canvas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { background: #f6f6fa; font-family: Inter, Arial, sans-serif; margin: 0; }
-    .container { max-width: 820px; margin: 30px auto; background: #fff; border-radius: 16px; padding: 28px 22px; box-shadow: 0 2px 14px #d3e0ee50; }
+    .container { max-width: 860px; margin: 30px auto; background: #fff; border-radius: 16px; padding: 28px 22px; box-shadow: 0 2px 14px #d3e0ee50; }
     h2 { color: #2266ee; margin: 0 0 18px 0; }
     .row { display: flex; gap: 16px; margin-bottom: 14px; flex-wrap: wrap;}
     .row > .field { flex: 1; min-width: 140px;}
@@ -23,6 +26,7 @@
     .problema-card { background: #f9faff; border: 1px solid #e1e1e9; border-radius: 10px; margin-bottom: 16px; padding: 14px; position: relative;}
     .remove-btn { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 1.2rem; color: #d33; cursor: pointer; }
     .remove-btn:hover { background: #fdeaea;}
+    .foto-thumb { display:inline-block; margin-top:5px; max-width:80px; max-height:60px; border-radius:7px; border:1px solid #ddd;}
     .add-btn, .submit-btn, .pdf-btn { background: #2266ee; color: #fff; border: none; padding: 10px 24px; border-radius: 9px; cursor: pointer; font-weight: 600; margin-top: 8px; margin-right: 6px;}
     .add-btn:hover, .submit-btn:hover, .pdf-btn:hover { background: #1143bb;}
     .listagem { margin-top: 32px;}
@@ -47,11 +51,27 @@
         </div>
         <div class="field">
           <label for="tecnico">Técnico</label>
-          <input type="text" id="tecnico" name="tecnico" required>
+          <select id="tecnico" name="tecnico" required>
+            <option value="" disabled selected>Selecione</option>
+            <option>Jorge Woicikoski</option>
+            <option>Daniel Cunha</option>
+            <option>Adriano Madalena</option>
+            <option>Odair Konnel</option>
+            <option>Felipe Moreira</option>
+          </select>
         </div>
         <div class="field">
           <label for="cliente">Cliente</label>
-          <input type="text" id="cliente" name="cliente" required>
+          <select id="cliente" name="cliente" required>
+            <option value="" disabled selected>Selecione</option>
+            <option>Karsten</option>
+            <option>Luli Malhas</option>
+            <option>Suvicor</option>
+            <option>Rovitex</option>
+            <option>Benvetex</option>
+            <option>RVB</option>
+            <option>Nanete</option>
+          </select>
         </div>
       </div>
       <div id="problemasContainer"></div>
@@ -97,6 +117,13 @@
           <textarea name="obs_resultado[]"></textarea>
         </div>
       </div>
+      <div class="row">
+        <div class="field">
+          <label>Foto (opcional)</label>
+          <input type="file" name="foto[]" accept="image/*" onchange="previewFoto(this)">
+          <img class="foto-thumb" style="display:none;">
+        </div>
+      </div>
     </div>
   </template>
 
@@ -111,33 +138,52 @@ const firebaseConfig = {
   appId: "1:606553696365:web:4c95e03fd3fa831eb4f764"
 };
 
-    // Inicialização Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const storage = firebase.storage();
 
-    // Utils
     function uuid() {
       return Math.random().toString(36).substr(2, 9) + Date.now();
     }
 
-    // Adiciona problema no formulário
     function adicionarProblema(problemaData = null) {
       const template = document.getElementById('problemaTemplate');
       const clone = template.content.cloneNode(true);
+
+      // Preencher se vier data (edição)
       if (problemaData) {
-        const inputs = clone.querySelectorAll('input, textarea, select');
+        const inputs = clone.querySelectorAll('input[type="text"], textarea, select');
         inputs[0].value = problemaData.problema;
         inputs[1].value = problemaData.observacoes;
         inputs[2].value = problemaData.resultado;
         inputs[3].value = problemaData.obs_resultado;
+        // Foto
+        if (problemaData.fotoUrl) {
+          const img = clone.querySelector('.foto-thumb');
+          img.src = problemaData.fotoUrl;
+          img.style.display = 'inline-block';
+        }
       }
       document.getElementById('problemasContainer').appendChild(clone);
     }
+
     function removerProblema(btn) {
       btn.closest('.problema-card').remove();
     }
 
-    // Ao carregar, seta data de hoje e pelo menos um problema
+    function previewFoto(input) {
+      const file = input.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = input.parentNode.querySelector('.foto-thumb');
+          img.src = e.target.result;
+          img.style.display = 'inline-block';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
     window.onload = function() {
       let today = new Date().toISOString().substr(0, 10);
       document.getElementById('data').value = today;
@@ -145,23 +191,40 @@ const firebaseConfig = {
       carregarReportes();
     };
 
-    // Salvar ou atualizar reporte
-    document.getElementById('reporteForm').addEventListener('submit', function(e) {
+    document.getElementById('reporteForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const id = document.getElementById('reporteId').value || uuid();
       const data = document.getElementById('data').value;
       const tecnico = document.getElementById('tecnico').value;
       const cliente = document.getElementById('cliente').value;
       const problemas = [];
-      document.querySelectorAll('#problemasContainer .problema-card').forEach(card => {
-        const inputs = card.querySelectorAll('input, textarea, select');
+      const problemasCards = document.querySelectorAll('#problemasContainer .problema-card');
+
+      // 1. Upload das fotos, se houver
+      for (let i = 0; i < problemasCards.length; i++) {
+        const card = problemasCards[i];
+        const inputs = card.querySelectorAll('input[type="text"], textarea, select, input[type="file"]');
+        let fotoUrl = '';
+        const fileInput = inputs[4];
+        if (fileInput && fileInput.files.length) {
+          const file = fileInput.files[0];
+          const storageRef = storage.ref(`reportes/${id}/problema${i}_${file.name}`);
+          await storageRef.put(file);
+          fotoUrl = await storageRef.getDownloadURL();
+        } else if (card.querySelector('.foto-thumb') && card.querySelector('.foto-thumb').src && !card.querySelector('.foto-thumb').src.startsWith('data:')) {
+          // Edição: manter URL existente
+          fotoUrl = card.querySelector('.foto-thumb').src;
+        }
         problemas.push({
           problema: inputs[0].value,
           observacoes: inputs[1].value,
           resultado: inputs[2].value,
-          obs_resultado: inputs[3].value
+          obs_resultado: inputs[3].value,
+          fotoUrl: fotoUrl || ""
         });
-      });
+      }
+
+      // 2. Salva no Realtime Database
       db.ref('reportes/' + id).set({
         id, data, tecnico, cliente, problemas
       }, (err) => {
@@ -179,7 +242,6 @@ const firebaseConfig = {
       });
     });
 
-    // Carregar reportes antigos
     function carregarReportes() {
       db.ref('reportes').once('value', snap => {
         const lista = document.getElementById('listaReportes');
@@ -204,7 +266,6 @@ const firebaseConfig = {
       });
     }
 
-    // Editar reporte (preenche o formulário)
     window.editarReporte = function(id) {
       db.ref('reportes/' + id).once('value', snap => {
         if (!snap.exists()) return;
@@ -219,9 +280,8 @@ const firebaseConfig = {
       });
     };
 
-    // Gerar PDF
     window.gerarPDFReporte = function(id) {
-      db.ref('reportes/' + id).once('value', snap => {
+      db.ref('reportes/' + id).once('value', async snap => {
         if (!snap.exists()) return;
         const rep = snap.val();
         // Gera HTML temporário para PDF
@@ -241,12 +301,13 @@ const firebaseConfig = {
                 <b>Observações:</b> ${p.observacoes || "-"}<br>
                 <b>Resultado:</b> ${p.resultado}<br>
                 <b>Obs. Resultado:</b> ${p.obs_resultado || "-"}
+                ${p.fotoUrl ? `<br><img src="${p.fotoUrl}" style="max-width:120px;max-height:80px;margin:6px 0;border-radius:6px;border:1px solid #ddd;">` : ''}
               </div>
             `).join('')}
           </div>
         `;
         document.body.appendChild(tempDiv);
-        html2canvas(tempDiv, {scale:2}).then(canvas => {
+        await html2canvas(tempDiv, {scale:2}).then(canvas => {
           const imgData = canvas.toDataURL('image/png');
           const pdf = new window.jspdf.jsPDF({orientation:'p',unit:'pt',format:'a4'});
           const pageWidth = pdf.internal.pageSize.getWidth();
@@ -258,7 +319,6 @@ const firebaseConfig = {
         });
       });
     };
-
   </script>
 </body>
 </html>
