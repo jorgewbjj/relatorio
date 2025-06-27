@@ -1,5 +1,6 @@
 
-<!DOCTYPE html>
+
+  <!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -73,7 +74,7 @@
         </div>
       </div>
       <div id="problemasContainer"></div>
-      <button type="button" class="add-btn" onclick="adicionarProblema()">+ Adicionar Problema</button>
+      <button type="button" class="add-btn" id="btnAddProblema">+ Adicionar Problema</button>
       <button type="submit" class="submit-btn">Salvar Reporte</button>
     </form>
 
@@ -139,10 +140,12 @@
     const db = firebase.database();
     const storage = firebase.storage();
 
+    // Gera um ID único simples
     function uuid() {
       return Math.random().toString(36).substr(2, 9) + Date.now();
     }
 
+    // Adiciona card de problema (opcionalmente preenchido)
     function adicionarProblema(problemaData = null) {
       const template = document.getElementById('problemaTemplate');
       const clone = template.content.cloneNode(true);
@@ -163,9 +166,16 @@
     }
 
     function removerProblema(btn) {
-      btn.closest('.problema-card').remove();
+      const container = document.getElementById('problemasContainer');
+      // Garante que ao menos 1 problema fique no formulário
+      if (container.querySelectorAll('.problema-card').length > 1) {
+        btn.closest('.problema-card').remove();
+      } else {
+        alert('O reporte deve conter pelo menos um problema.');
+      }
     }
 
+    // Mostra a prévia da foto no card
     function previewFoto(input) {
       const file = input.files[0];
       if (file) {
@@ -179,13 +189,21 @@
       }
     }
 
+    // Adiciona pelo menos um problema ao abrir
     window.onload = function() {
       let today = new Date().toISOString().substr(0, 10);
       document.getElementById('data').value = today;
+      document.getElementById('problemasContainer').innerHTML = '';
       adicionarProblema();
       carregarReportes();
     };
 
+    // Garante que sempre exista ao menos um card de problema
+    document.getElementById('btnAddProblema').onclick = function() {
+      adicionarProblema();
+    };
+
+    // Envia formulário (salva no Realtime DB e Storage)
     document.getElementById('reporteForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const id = document.getElementById('reporteId').value || uuid();
@@ -234,6 +252,7 @@
       });
     });
 
+    // Lista todos os reportes salvos
     function carregarReportes() {
       db.ref('reportes').once('value', snap => {
         const lista = document.getElementById('listaReportes');
@@ -258,6 +277,7 @@
       });
     }
 
+    // Preenche o formulário para edição
     window.editarReporte = function(id) {
       db.ref('reportes/' + id).once('value', snap => {
         if (!snap.exists()) return;
@@ -272,7 +292,7 @@
       });
     };
 
-    // Função para pegar uma imagem de URL e retornar base64
+    // Auxiliar: converte imagem para base64
     function getBase64ImageFromUrl(url) {
       return fetch(url)
         .then(response => response.blob())
@@ -284,7 +304,7 @@
         }));
     }
 
-    // Gera PDF com fotos do storage
+    // Gera o PDF (com as imagens do storage!)
     window.gerarPDFReporte = async function(id) {
       db.ref('reportes/' + id).once('value', async snap => {
         if (!snap.exists()) return;
@@ -307,7 +327,6 @@
         pdf.text(`Cliente: ${rep.cliente}`, 40, y);
         y += 26;
 
-        // Carrega e insere as imagens uma por uma
         for (let i = 0; i < rep.problemas.length; i++) {
           const p = rep.problemas[i];
           pdf.setFont(undefined, 'bold');
