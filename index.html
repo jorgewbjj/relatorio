@@ -1,6 +1,5 @@
 
-
-   <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -10,9 +9,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-  <!-- jsPDF e html2canvas -->
+  <!-- jsPDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { background: #f6f6fa; font-family: Inter, Arial, sans-serif; margin: 0; }
     .container { max-width: 860px; margin: 30px auto; background: #fff; border-radius: 16px; padding: 28px 22px; box-shadow: 0 2px 14px #d3e0ee50; }
@@ -129,7 +127,6 @@
 
   <script>
     // CONFIGURE AQUI O SEU FIREBASE
-const firebaseConfig = {
   apiKey: "AIzaSyDckXEwRF2Fh0rQT_S9BZlSPZ5xwYJMgtw",
   authDomain: "relatoriohanier.firebaseapp.com",
   projectId: "relatoriohanier",
@@ -150,14 +147,12 @@ const firebaseConfig = {
       const template = document.getElementById('problemaTemplate');
       const clone = template.content.cloneNode(true);
 
-      // Preencher se vier data (edição)
       if (problemaData) {
         const inputs = clone.querySelectorAll('input[type="text"], textarea, select');
         inputs[0].value = problemaData.problema;
         inputs[1].value = problemaData.observacoes;
         inputs[2].value = problemaData.resultado;
         inputs[3].value = problemaData.obs_resultado;
-        // Foto
         if (problemaData.fotoUrl) {
           const img = clone.querySelector('.foto-thumb');
           img.src = problemaData.fotoUrl;
@@ -200,7 +195,6 @@ const firebaseConfig = {
       const problemas = [];
       const problemasCards = document.querySelectorAll('#problemasContainer .problema-card');
 
-      // 1. Upload das fotos, se houver
       for (let i = 0; i < problemasCards.length; i++) {
         const card = problemasCards[i];
         const inputs = card.querySelectorAll('input[type="text"], textarea, select, input[type="file"]');
@@ -212,7 +206,6 @@ const firebaseConfig = {
           await storageRef.put(file);
           fotoUrl = await storageRef.getDownloadURL();
         } else if (card.querySelector('.foto-thumb') && card.querySelector('.foto-thumb').src && !card.querySelector('.foto-thumb').src.startsWith('data:')) {
-          // Edição: manter URL existente
           fotoUrl = card.querySelector('.foto-thumb').src;
         }
         problemas.push({
@@ -224,7 +217,6 @@ const firebaseConfig = {
         });
       }
 
-      // 2. Salva no Realtime Database
       db.ref('reportes/' + id).set({
         id, data, tecnico, cliente, problemas
       }, (err) => {
@@ -280,43 +272,74 @@ const firebaseConfig = {
       });
     };
 
-    window.gerarPDFReporte = function(id) {
+    // Função para pegar uma imagem de URL e retornar base64
+    function getBase64ImageFromUrl(url) {
+      return fetch(url)
+        .then(response => response.blob())
+        .then(blob => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        }));
+    }
+
+    // Gera PDF com fotos do storage
+    window.gerarPDFReporte = async function(id) {
       db.ref('reportes/' + id).once('value', async snap => {
         if (!snap.exists()) return;
         const rep = snap.val();
-        // Gera HTML temporário para PDF
-        const tempDiv = document.createElement('div');
-        tempDiv.style.padding = '20px';
-        tempDiv.style.maxWidth = '680px';
-        tempDiv.innerHTML = `
-          <h2 style="color:#2266ee">Reporte Técnico</h2>
-          <div><b>Data:</b> ${rep.data}</div>
-          <div><b>Técnico:</b> ${rep.tecnico}</div>
-          <div><b>Cliente:</b> ${rep.cliente}</div>
-          <br>
-          <div>
-            ${rep.problemas.map((p,i) => `
-              <div style="margin-bottom:18px; border-bottom:1px solid #ddd; padding-bottom:10px;">
-                <b>Problema ${i+1}:</b> ${p.problema}<br>
-                <b>Observações:</b> ${p.observacoes || "-"}<br>
-                <b>Resultado:</b> ${p.resultado}<br>
-                <b>Obs. Resultado:</b> ${p.obs_resultado || "-"}
-                ${p.fotoUrl ? `<br><img src="${p.fotoUrl}" style="max-width:120px;max-height:80px;margin:6px 0;border-radius:6px;border:1px solid #ddd;">` : ''}
-              </div>
-            `).join('')}
-          </div>
-        `;
-        document.body.appendChild(tempDiv);
-        await html2canvas(tempDiv, {scale:2}).then(canvas => {
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new window.jspdf.jsPDF({orientation:'p',unit:'pt',format:'a4'});
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const imgWidth = pageWidth - 40;
-          const imgHeight = canvas.height * imgWidth / canvas.width;
-          pdf.addImage(imgData, 'PNG', 20, 20, imgWidth, imgHeight);
-          pdf.save('reporte_'+rep.data+'.pdf');
-          tempDiv.remove();
-        });
+
+        const pdf = new window.jspdf.jsPDF({orientation:'p',unit:'pt',format:'a4'});
+        let y = 30;
+
+        pdf.setFontSize(20);
+        pdf.setTextColor(34,102,238);
+        pdf.text('Reporte Técnico', 40, y);
+        y += 32;
+
+        pdf.setFontSize(12);
+        pdf.setTextColor(0,0,0);
+        pdf.text(`Data: ${rep.data}`, 40, y);
+        y += 18;
+        pdf.text(`Técnico: ${rep.tecnico}`, 40, y);
+        y += 18;
+        pdf.text(`Cliente: ${rep.cliente}`, 40, y);
+        y += 26;
+
+        // Carrega e insere as imagens uma por uma
+        for (let i = 0; i < rep.problemas.length; i++) {
+          const p = rep.problemas[i];
+          pdf.setFont(undefined, 'bold');
+          pdf.text(`Problema ${i+1}:`, 40, y);
+          pdf.setFont(undefined, 'normal');
+          y += 14;
+          pdf.text(`Descrição: ${p.problema}`, 50, y); y += 14;
+          pdf.text(`Observações: ${p.observacoes || "-"}`, 50, y); y += 14;
+          pdf.text(`Resultado: ${p.resultado}`, 50, y); y += 14;
+          pdf.text(`Obs. Resultado: ${p.obs_resultado || "-"}`, 50, y); y += 8;
+
+          if (p.fotoUrl) {
+            y += 6;
+            pdf.text("Foto:", 50, y); y += 2;
+            try {
+              const imgBase64 = await getBase64ImageFromUrl(p.fotoUrl);
+              pdf.addImage(imgBase64, 'JPEG', 60, y, 90, 65);
+              y += 75;
+            } catch (e) {
+              y += 10;
+            }
+          } else {
+            y += 14;
+          }
+          y += 8;
+          if (y > 720) {
+            pdf.addPage();
+            y = 40;
+          }
+        }
+
+        pdf.save('reporte_'+rep.data+'.pdf');
       });
     };
   </script>
